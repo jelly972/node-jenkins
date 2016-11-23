@@ -173,6 +173,69 @@ describe('jenkins', function() {
       });
     });
 
+    describe('getMultiBranch', function() {
+      it('should return build details', function(done) {
+        var self = this;
+
+        var jobs = [];
+
+        self.nock
+            .post('/job/' + this.jobName + '/job/' + this.branchName + '/build')
+            .reply(201, '', { location: 'http://localhost:8080/queue/item/1/' })
+            .get('/job/' + self.jobName + '/job/' + self.branchName + '/1/api/json')
+            .reply(200, fixtures.buildGet);
+
+        jobs.push(function(next) {
+          self.jenkins.job.buildMultiBranch(self.jobName, self.branchName, function(err, number) {
+            should.not.exist(err);
+
+            next(null, number);
+          });
+        });
+
+        jobs.push(function(next) {
+          async.retry(
+              100,
+              function(next) {
+                self.jenkins.build.getMultiBranch(
+                    self.jobName,
+                    self.branchName,
+                    1,
+                    function(err, data) {
+                  if (err) return setTimeout(function() { return next(err); }, 100);
+
+                  data.should.have.property('number');
+                  data.number.should.equal(1);
+
+                  next();
+                });
+              },
+              next
+          );
+
+        });
+
+        async.series(jobs, done);
+      });
+
+      nit('should return error when it does not exist', function(done) {
+        var self = this;
+
+        this.nock
+            .get('/job/' + this.jobName + '/job/' + this.branchName + '/2/api/json')
+            .reply(404);
+
+        this.jenkins.build.getMultiBranch(this.jobName, this.branchName, 2, function(err, data) {
+          should.exist(err);
+          should.equal(err.message, 'jenkins: build.get: ' + self.jobName + ' ' + self.branchName + ' 2 not found');
+
+          should.not.exist(data);
+
+          done();
+        });
+      });
+    });
+
     describe('stop', function() {
       it('should stop build', function(done) {
         var self = this;
@@ -1648,6 +1711,7 @@ describe('jenkins', function() {
         ' - walk (sync)',
         ' Build',
         '  - get (callback)',
+        '  - getMultiBranch (callback)',
         '  - stop (callback)',
         '  - log (callback)',
         '  - logStream (eventemitter)',
