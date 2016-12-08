@@ -218,6 +218,51 @@ describe('jenkins', function() {
         async.series(jobs, done);
       });
 
+      it('should escape branch name properly', function(done) {
+        var branchName = 'feature/escape';
+        var self = this;
+
+        var jobs = [];
+
+        self.nock
+            .post('/job/' + this.jobName + '/job/' + encodeURIComponent(encodeURIComponent(branchName)) + '/build')
+            .reply(201, '', { location: 'http://localhost:8080/queue/item/1/' })
+            .get('/job/' + self.jobName + '/job/' + encodeURIComponent(encodeURIComponent(branchName)) + '/1/api/json')
+            .reply(200, fixtures.buildGet);
+
+        jobs.push(function(next) {
+          self.jenkins.job.buildMultiBranch(self.jobName, branchName, function(err, number) {
+            should.not.exist(err);
+
+            next(null, number);
+          });
+        });
+
+        jobs.push(function(next) {
+          async.retry(
+              100,
+              function(next) {
+                self.jenkins.build.getMultiBranch(
+                    self.jobName,
+                    branchName,
+                    1,
+                    function(err, data) {
+                      if (err) return setTimeout(function() { return next(err); }, 100);
+
+                      data.should.have.property('number');
+                      data.number.should.equal(1);
+
+                      next();
+                    });
+              },
+              next
+          );
+
+        });
+
+        async.series(jobs, done);
+      });
+
       nit('should return error when it does not exist', function(done) {
         var self = this;
 
