@@ -364,7 +364,7 @@ describe('jenkins', function() {
         var branchName = 'feature/escape';
 
         this.nock
-            .post('/job/' + this.jobName + '/job/' + encodeURIComponent(branchName) + '/build')
+            .post('/job/' + this.jobName + '/job/' + encodeURIComponent(encodeURIComponent(branchName)) + '/build')
             .reply(201, '', { location: 'http://localhost:8080/queue/item/5/' });
 
         this.jenkins.job.buildMultiBranch(this.jobName, branchName, function(err, number) {
